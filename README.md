@@ -112,6 +112,8 @@ Beyond_The_Prompt/
 ---
 
 ## 🏆 Hackathon Notes
+## Team
+Built collaboratively for our hackathon.
 
 - **Beginner-Friendly**: Zero external dependencies required to run.
 - **Data Integrity**: Uses 100% genuine data from the Starter Kit.
