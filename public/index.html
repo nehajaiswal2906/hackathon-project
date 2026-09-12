@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Corridor Opportunity Finder | Commercial District Intelligence</title>
+  <meta name="description" content="Data-driven commercial corridor discovery and ranking for cafe and hospitality expansion across NYC and Dallas-Fort Worth.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark-theme">
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-group">
+        <div class="logo-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+            <line x1="8" y1="2" x2="8" y2="18"></line>
+            <line x1="16" y1="6" x2="16" y2="22"></line>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">Corridor Opportunity Finder</div>
+          <div class="brand-subtitle">Commercial District Expansion & Format Matcher</div>
+        </div>
+      </div>
+
+      <!-- Metro Switcher -->
+      <div class="metro-toggle-group">
+        <span class="selector-label">Metro Area:</span>
+        <div class="segmented-control" id="metroSegmentedControl">
+          <button type="button" class="segment-btn active" data-metro="nyc" id="metroBtnNyc">
+            <span class="metro-flag">🗽</span> New York City <span class="badge-count" id="nycCountBadge">65</span>
+          </button>
+          <button type="button" class="segment-btn" data-metro="dfw" id="metroBtnDfw">
+            <span class="metro-flag">🤠</span> Dallas–Fort Worth <span class="badge-count" id="dfwCountBadge">72</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Compare Trigger -->
+      <div class="header-actions">
+        <button type="button" class="btn btn-secondary compare-pill-btn" id="openCompareBtn" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          Compare Corridors (<span id="compareCount">0</span>)
+        </button>
+      </div>
+    </div>
+
+    <!-- DFW Geometry Warning Notice Banner (conditional) -->
+    <div class="geometry-warning-banner" id="geometryWarningBanner" style="display: none;">
+      <div class="banner-inner">
+        <span class="warning-icon">⚠️</span>
+        <span class="warning-text">
+          <strong>Dallas–Fort Worth Geometry Notice:</strong> Hexagon geometry in DFW represents an activity display envelope, not parcel boundaries or property lines (per dataset specification).
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- Filter & Archetype Control Bar -->
+    <section class="control-panel glass-card">
+      <div class="control-row primary-controls">
+        <!-- Archetype Selector -->
+        <div class="control-item archetype-picker-group">
+          <label for="archetypeSelect">
+            <span class="label-icon">☕</span>
+            <span class="label-text">Select Business / Café Format:</span>
+            <span class="required-tag">Required</span>
+          </label>
+          <div class="select-wrapper">
+            <select id="archetypeSelect" class="form-select custom-select">
+              <!-- Options populated dynamically by app.js -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Ranking Metric Toggle -->
+        <div class="control-item ranking-mode-group">
+          <label for="rankingMetricSelect">
+            <span class="label-icon">⚡</span>
+            <span class="label-text">Primary Ranking Metric:</span>
+          </label>
+          <div class="select-wrapper">
+            <select id="rankingMetricSelect" class="form-select custom-select">
+              <option value="opportunity" selected>Multi-Signal Opportunity Score (Calculated)</option>
+              <option value="fit">Official Dataset Fit Score (0 - 100%)</option>
+              <option value="whitespace">Whitespace Opportunity Only (Supply Headroom)</option>
+              <option value="fewest_cafes">Least Existing Cafés (Lowest Saturation)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Archetype Mission & Gate Callout Card -->
+      <div class="archetype-brief-card" id="archetypeBriefCard">
+        <div class="archetype-brief-header">
+          <div class="archetype-name-line">
+            <span class="format-category-pill" id="archetypeCategoryPill">CAFÉ FORMAT</span>
+            <h2 class="archetype-title" id="archetypeName">Loading format...</h2>
+          </div>
+          <div class="archetype-gate-badge" id="archetypeGateContainer">
+            <span class="gate-label">Required Gate:</span>
+            <span class="gate-value" id="archetypeGate">None specified</span>
+          </div>
+        </div>
+        <p class="archetype-mission" id="archetypeMission">Description of format mission...</p>
+        <div class="archetype-signals" id="archetypeSignals">
+          <!-- Primary and supporting signal tags -->
+        </div>
+      </div>
+
+      <!-- Secondary Filters Row -->
+      <div class="control-row secondary-controls">
+        <!-- Borough/District Filter -->
+        <div class="filter-item">
+          <label for="boroughFilter">Borough / District:</label>
+          <select id="boroughFilter" class="form-select">
+            <option value="all">All Boroughs & Districts</option>
+          </select>
+        </div>
+
+        <!-- Tier Filter -->
+        <div class="filter-item">
+          <label for="tierFilter">Fit Tier:</label>
+          <select id="tierFilter" class="form-select">
+            <option value="all">All Fit Tiers</option>
+            <option value="STRONG_FIT">Strong Fit Only</option>
+            <option value="MODERATE_FIT">Moderate Fit</option>
+            <option value="WEAK_FIT">Weak Fit</option>
+            <option value="INSUFFICIENT_CONTEXT">Insufficient Context</option>
+            <option value="GATED_OUT">Gated Out</option>
+          </select>
+        </div>
+
+        <!-- Search Filter -->
+        <div class="filter-item search-filter">
+          <label for="searchInput">Search Corridor or Neighborhood:</label>
+          <div class="search-input-wrapper">
+            <input type="text" id="searchInput" placeholder="e.g. Soho, Midtown, Deep Ellum, Downtown..." class="form-input">
+            <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Clear search">&times;</button>
+          </div>
+        </div>
+
+        <!-- Reset Button -->
+        <div class="filter-item filter-reset">
+          <button type="button" class="btn btn-outline" id="resetFiltersBtn">Reset Filters</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI Summary Bar -->
+    <section class="kpi-strip">
+      <div class="kpi-card glass-card">
+        <div class="kpi-val" id="kpiTotalCorridors">0</div>
+        <div class="kpi-label">Filtered Corridors</div>
+      </div>
+      <div class="kpi-card glass-card highlight-kpi">
+        <div class="kpi-val" id="kpiStrongFits">0</div>
+        <div class="kpi-label">Strong Fit Districts</div>
+      </div>
+      <div class="kpi-card glass-card">
+        <div class="kpi-val" id="kpiTopCorridor">None</div>
+        <div class="kpi-label">#1 Recommended Corridor</div>
+      </div>
+      <div class="kpi-card glass-card">
+        <div class="kpi-val" id="kpiAvgWhitespace">0</div>
+        <div class="kpi-label">Avg Café Whitespace</div>
+      </div>
+      <div class="kpi-card glass-card">
+        <div class="kpi-val" id="kpiAvgCafes">0</div>
+        <div class="kpi-label">Avg Existing Cafés</div>
+      </div>
+    </section>
+
+    <!-- View Mode Switcher: Cards vs Map vs Methodology -->
+    <div class="view-switch-row">
+      <div class="view-tabs">
+        <button type="button" class="view-tab active" data-view="cards" id="viewTabCards">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          Ranked Corridor Cards (<span id="cardsCountLabel">0</span>)
+        </button>
+        <button type="button" class="view-tab" data-view="map" id="viewTabMap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+            <line x1="8" y1="2" x2="8" y2="18"></line>
+            <line x1="16" y1="6" x2="16" y2="22"></line>
+          </svg>
+          Interactive Geospatial Map
+        </button>
+        <button type="button" class="view-tab" data-view="methodology" id="viewTabMethodology">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          Data Sources & Methodology
+        </button>
+      </div>
+
+      <div class="sort-info-pill" id="sortInfoPill">
+        <span>Sorted by: <strong>Opportunity Index</strong></span>
+      </div>
+    </div>
+
+    <!-- VIEW 1: Corridor Cards Grid -->
+    <section class="view-section" id="cardsView">
+      <div class="corridors-grid" id="corridorsGrid">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="no-results" id="noResultsNotice" style="display: none;">
+        <div class="no-results-icon">🔍</div>
+        <h3>No matching corridors found</h3>
+        <p>Try clearing your search query or loosening your tier/borough filters.</p>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('resetFiltersBtn').click()">Reset Filters</button>
+      </div>
+    </section>
+
+    <!-- VIEW 2: Interactive Map -->
+    <section class="view-section" id="mapView" style="display: none;">
+      <div class="map-layout">
+        <div class="map-container-wrap glass-card">
+          <div id="corridorMap" class="corridor-map"></div>
+          <div class="map-legend">
+            <div class="legend-title">Fit Tier Legend</div>
+            <div class="legend-item"><span class="dot dot-strong"></span> Strong Fit</div>
+            <div class="legend-item"><span class="dot dot-moderate"></span> Moderate Fit</div>
+            <div class="legend-item"><span class="dot dot-weak"></span> Weak Fit</div>
+            <div class="legend-item"><span class="dot dot-gated"></span> Gated Out / Insufficient</div>
+          </div>
+        </div>
+        <div class="map-sidebar glass-card" id="mapSidebar">
+          <div class="sidebar-header">
+            <h3>Corridor Quick View</h3>
+            <p class="muted-text">Click any pin on the map to inspect corridor details.</p>
+          </div>
+          <div id="mapSidebarContent" class="sidebar-body">
+            <div class="map-placeholder-hint">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="10" r="3"></circle>
+                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
+              </svg>
+              <p>Select a corridor pin to preview fit score, opportunity signals, and nearby mapped places.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: Data Lineage & Methodology -->
+    <section class="view-section" id="methodologyView" style="display: none;">
+      <div class="methodology-container glass-card">
+        <h2>Dataset Lineage & Opportunity Scoring Methodology</h2>
+        <p class="subtitle">Complete transparency regarding authentic data fields, formulas, and geometry specifications.</p>
+
+        <div class="method-grid">
+          <div class="method-card">
+            <h3>1. Authentic Data Source</h3>
+            <p>This application reads directly from the official Hackathon Starter Kit snapshot: <code>usa-corridors-20260906-r2</code>.</p>
+            <ul>
+              <li><strong>NYC Corridors:</strong> 65 named commercial corridors, 31 café archetypes, 1,860 verified fit scores.</li>
+              <li><strong>Dallas–Fort Worth Corridors:</strong> 72 named commercial corridors, 67 archetypes (31 café + 36 restaurant), 4,824 verified scores.</li>
+              <li><strong>Zero Simulated Data:</strong> Corridor names, scores, whitespace values, and place listings are 100% genuine.</li>
+            </ul>
+          </div>
+
+          <div class="method-card">
+            <h3>2. Official Fit Score vs. Opportunity Score</h3>
+            <p>We provide two distinct lenses for evaluation:</p>
+            <ul>
+              <li><strong>Official Fit Score (0.0 to 1.0):</strong> The baseline machine score from the dataset indicating how well a business format matches corridor demand dynamics and audience contracts.</li>
+              <li><strong>Opportunity Index (Application Calculation):</strong> A derived formula suggested in the <em>Corridor Opportunity Finder Guide</em> that balances fit with market room:
+                <div class="formula-box">
+                  <code>Opportunity = (Fit Score × 100) + (Whitespace × 0.40) - (Existing Café Density Penalty)</code>
+                </div>
+                <em>High fit + high whitespace + manageable competition = highest opportunity.</em>
+              </li>
+            </ul>
+          </div>
+
+          <div class="method-card">
+            <h3>3. Whitespace Quality</h3>
+            <p>Found in <code>corridor.behavior.whitespace_quality.cafe</code> (0 to 100). Represents an expert supply/demand opportunity assessment for cafés. A higher number indicates more room for new concepts without immediate over-saturation.</p>
+          </div>
+
+          <div class="method-card">
+            <h3>4. Dallas–Fort Worth Geometry Warning</h3>
+            <p>Per the official dataset documentation:</p>
+            <blockquote class="warning-quote">
+              "NYC has canonical, non-overlapping H3-10 corridor ownership. Dallas–Fort Worth does not yet have canonical H3-10 ownership; its exported H3-9 geometry is a named activity display envelope and must not be treated as a parcel boundary or exact site catchment."
+            </blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- DEEP DIVE DRAWER / MODAL -->
+  <div class="modal-overlay" id="detailModalOverlay" style="display: none;">
+    <div class="modal-card glass-card" id="detailModalCard">
+      <button type="button" class="close-modal-btn" id="closeDetailModalBtn" title="Close modal">&times;</button>
+      
+      <div class="modal-header">
+        <div class="modal-header-badge-row">
+          <span class="borough-badge" id="modalBorough">Manhattan</span>
+          <span class="tier-pill" id="modalTierPill">STRONG FIT</span>
+          <span class="calc-badge" id="modalRankBadge">Rank #1</span>
+        </div>
+        <h2 class="modal-corridor-name" id="modalCorridorName">SoHo Broadway</h2>
+        <div class="modal-neighborhoods" id="modalNeighborhoods">SoHo, Cast Iron Historic District</div>
+      </div>
+
+      <div class="modal-body">
+        <!-- Character Summary -->
+        <div class="modal-section character-section">
+          <h4 class="section-title">Corridor Character & Context</h4>
+          <p class="character-text" id="modalCharacter">Loading corridor character...</p>
+        </div>
+
+        <!-- WHY THIS CORRIDOR STANDS OUT -->
+        <div class="modal-section why-highlight-section">
+          <h4 class="section-title">Why This Corridor Was Recommended</h4>
+          <div class="why-box" id="modalWhyBox">
+            <!-- Dynamic synthesized explanation -->
+          </div>
+        </div>
+
+        <!-- Scores Breakdown Grid -->
+        <div class="modal-section">
+          <h4 class="section-title">Core Opportunity Signals</h4>
+          <div class="signal-metrics-grid">
+            <div class="signal-card">
+              <div class="signal-label">Official Fit Score</div>
+              <div class="signal-value" id="modalFitScore">0.8500</div>
+              <div class="signal-subtext" id="modalFitPercent">85.0% Fit</div>
+            </div>
+            <div class="signal-card">
+              <div class="signal-label">Opportunity Score</div>
+              <div class="signal-value highlight-num" id="modalOppScore">92.4</div>
+              <div class="signal-subtext">Calculated Index</div>
+            </div>
+            <div class="signal-card">
+              <div class="signal-label">Café Whitespace</div>
+              <div class="signal-value" id="modalWhitespace">74 / 100</div>
+              <div class="signal-subtext">Demand Headroom</div>
+            </div>
+            <div class="signal-card">
+              <div class="signal-label">Existing Cafés</div>
+              <div class="signal-value" id="modalCafeCount">24</div>
+              <div class="signal-subtext">Current Competition</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DFW Contributions or NYC Signal Contract -->
+        <div class="modal-section" id="modalContributionsSection">
+          <h4 class="section-title">Signal Contributions & Demand Breakdown</h4>
+          <div id="modalContributionsContent">
+            <!-- Signal contributions table or bars -->
+          </div>
+        </div>
+
+        <!-- Audience Personas -->
+        <div class="modal-section">
+          <h4 class="section-title">Top Associated Audience Personas (Scored 1 to 7)</h4>
+          <div class="audiences-list" id="modalAudiencesList">
+            <!-- Rendered list of personas -->
+          </div>
+        </div>
+
+        <!-- Anchors & Special Zones -->
+        <div class="modal-section two-col-section">
+          <div>
+            <h4 class="section-title">Core Anchors & Traffic Drivers</h4>
+            <div class="anchors-list" id="modalAnchorsList">
+              <!-- Anchors list -->
+            </div>
+          </div>
+          <div>
+            <h4 class="section-title">Adjacent Special Zones</h4>
+            <div class="special-zones-list" id="modalSpecialZonesList">
+              <!-- Special zones list -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Mapped Representative Places -->
+        <div class="modal-section">
+          <h4 class="section-title">Representative Places in Corridor (<span id="modalPlacesCount">0</span> sampled)</h4>
+          <div class="places-chips-container" id="modalPlacesChips">
+            <!-- Place chips -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="modalCompareToggleBtn">Add to Compare</button>
+        <button type="button" class="btn btn-primary" id="modalCloseBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDE-BY-SIDE COMPARISON MODAL -->
+  <div class="modal-overlay" id="compareModalOverlay" style="display: none;">
+    <div class="modal-card glass-card compare-modal-card">
+      <button type="button" class="close-modal-btn" id="closeCompareModalBtn" title="Close compare">&times;</button>
+      <div class="modal-header">
+        <h2 class="modal-corridor-name">Side-by-Side Corridor Comparison</h2>
+        <p class="subtitle">Comparing top candidate corridors for <span id="compareArchetypeTitle">Selected Format</span></p>
+      </div>
+      <div class="modal-body">
+        <div class="comparison-table-wrapper">
+          <table class="comparison-table" id="comparisonTable">
+            <!-- Comparison rows generated dynamically -->
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" id="clearCompareBtn">Clear Comparison</button>
+        <button type="button" class="btn btn-primary" id="closeCompareFooterBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <strong>Corridor Opportunity Finder</strong> — Built for the <em>Beyond the Prompt</em> Hackathon.
+      </div>
+      <div class="footer-right">
+        Dataset: <code>usa-corridors-20260906-r2</code> • 137 Corridors • 6,684 Fit Scores • 100% Real Data
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS for Map -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Application JS -->
+  <script src="js/app.js"></script>
+</body>
+</html>
